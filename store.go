@@ -1,12 +1,16 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
+	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -100,4 +104,68 @@ func ImageExists(cli *client.Client, imageName string) bool {
 		}
 	}
 	return false
+}
+
+func (s *store) BuildContainerImage(workspaceDir string, imageName string) error {
+	// Crear tar del workspace
+	tarBuf := new(bytes.Buffer)
+	tw := tar.NewWriter(tarBuf)
+
+	err := filepath.Walk(workspaceDir, func(file string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if fi.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(workspaceDir, file)
+		if err != nil {
+			return err
+		}
+
+		f, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		hdr := &tar.Header{
+			Name: relPath,
+			Mode: 0644,
+			Size: fi.Size(),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error creando tar: %v", err)
+	}
+	tw.Close()
+
+	// Construir imagen con Docker
+	buildOptions := build.ImageBuildOptions{
+		Tags:       []string{imageName},
+		Dockerfile: "Dockerfile", // Debe existir en workspaceDir
+		Remove:     true,         // Limpiar capas intermedias
+	}
+
+	buildResp, err := s.client.ImageBuild(ctx, bytes.NewReader(tarBuf.Bytes()), buildOptions)
+	if err != nil {
+		return fmt.Errorf("error construyendo imagen: %v", err)
+	}
+	defer buildResp.Body.Close()
+
+	// Mostrar salida de build
+	if _, err := io.Copy(os.Stdout, buildResp.Body); err != nil {
+		return fmt.Errorf("error leyendo salida build: %v", err)
+	}
+
+	fmt.Println("✅ Imagen construida con nombre:", imageName)
+	return nil
 }
