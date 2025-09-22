@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v2.11
+    command:
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    
+    networks:
+      - backend-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    networks:
+      - backend-network
+  api:
+      build: ./    # tu proyecto Go
+      container_name: api
+      ports:
+        - "8080:8080"   # expone tu API para que puedas llamarla desde fuera
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      environment:
+        - DOCKER_HOST=unix:///var/run/docker.sock
+      networks:
+      - backend-network
+      labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
+      - "traefik.http.services.api.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.api.middlewares=api-stripprefix"
+      depends_on:
+      - mongodb
+
+networks:
+  backend-network:
+    driver: "bridge"
+    external: true
