@@ -50,7 +50,13 @@ func (s *store) NewContainer(containerImage, serviceName string) error {
 	}
 
 	// Verificar si la imagen existe localmente
-	if !s.ImageExists(containerImage) {
+	exists, err := s.ImageExists(containerImage)
+	if err != nil {
+		log.Fatalf("Error checking image existence: %v", err)
+		return err
+	}
+
+	if !exists {
 		log.Printf("Image %s not found, pulling from Docker Hub...", containerImage)
 		if err := s.ImagePull(containerImage); err != nil {
 			log.Fatalf("Error pulling image: %v", err)
@@ -125,21 +131,22 @@ func (s *store) ImagePull(containerImage string) (err error) {
 	return nil
 }
 
-func (s *store) ImageExists(imageName string) bool {
+func (s *store) ImageExists(imageName string) (bool, error) {
 	ctx := context.Background()
 	images, err := s.client.ImageList(ctx, image.ListOptions{})
 	if err != nil {
 		log.Fatalf("Error al listar imágenes: %v", err)
+		return false, err
 	}
 
 	for _, img := range images {
 		for _, tag := range img.RepoTags {
 			if tag == imageName {
-				return true
+				return true, nil
 			}
 		}
 	}
-	return false
+	return false, nil
 }
 
 func (s *store) BuildContainerImage(workspaceDir string, imageName string) error {
