@@ -1,5 +1,7 @@
 package main
 
+//Son todas las funciones que interactúan con la base de datos y Docker
+
 import (
 	"archive/tar"
 	"bytes"
@@ -352,4 +354,31 @@ func (s *store) DeleteContainerDocument(userID, containerName string) error {
 	}
 
 	return nil
+}
+
+func (s *store) GetContainersByUser(userID string) ([]ContainerRecord, error) {
+	collection := s.database.Collection("containers")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.M{"userID": userID}
+	cur, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to querry containers: %w", err)
+	}
+
+	defer cur.Close(ctx)
+
+	var results []ContainerRecord
+	for cur.Next(ctx) {
+		var rec ContainerRecord
+		if err := cur.Decode(&rec); err != nil {
+			return nil, fmt.Errorf("failed to decode container : %w", err)
+		}
+		results = append(results, rec)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error: %w", err)
+	}
+	return results, nil
 }

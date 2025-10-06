@@ -1,5 +1,8 @@
 package main
 
+//Aquí creo los endpoints
+//Crear una función que retorne en JSON los documentos de la colección containers que pertenezcan al usuario autenticado GET
+
 import (
 	"bytes"
 	"encoding/json"
@@ -29,6 +32,7 @@ func (h *handler) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /stop/container", WithJWTAuth(h.HandleStopContainer))
 	mux.HandleFunc("POST /start/container", WithJWTAuth(h.HandleStartContainer))
 	mux.HandleFunc("POST /new/image", WithJWTAuth(h.HandleImageCreation))
+	mux.HandleFunc("GET /containers", WithJWTAuth(h.HandleListUserContainers))
 }
 
 func (h *handler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
@@ -134,17 +138,21 @@ func (h *handler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) HandleNewContainer(w http.ResponseWriter, r *http.Request) {
+	//Same
 	userID, err := GetUserIDFromContext(r.Context())
 	if err != nil {
 		log.Printf("Unauthorized access: %v", err)
 		WriteError(w, http.StatusUnauthorized, "unauthorized: "+err.Error())
 		return
 	}
+
 	println("User ID from context:", userID)
+	//
 
-	var payload contenedor
+	var payload contenedor //Tipo del JSON que se recibe en el ENDPOINT
 
-	if err := ParseJSON(r, &payload); err != nil {
+	//Same
+	if err := ParseJSON(r, &payload); err != nil { //Parsea el JSON al struct
 		log.Printf("Error parsing JSON: %v", err)
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -155,7 +163,9 @@ func (h *handler) HandleNewContainer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "invalid payload: "+formattedErrors)
 		return
 	}
+	//
 
+	//-Logica del ENDPOINT------->
 	err = h.store.NewContainer(payload.Image, payload.Image)
 	o := payload
 	if err != nil {
@@ -186,6 +196,7 @@ func (h *handler) HandleNewContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteJSON(w, http.StatusOK, o)
+	//<----------------------
 
 }
 
@@ -427,4 +438,28 @@ func (h *handler) HandleImageCreation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]string{"image": imageName})
+}
+
+func (h *handler) HandleListUserContainers(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserIDFromContext(r.Context())
+	if err != nil {
+		log.Printf("Unauthorized access: %v", err)
+		WriteError(w, http.StatusUnauthorized, "unauthorized: "+err.Error())
+		return
+	}
+
+	println("User ID from context:", userID)
+
+	//
+	records, err := h.store.GetContainersByUser(userID)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to fetch containers: "+err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"containers": records,
+		"count":      len(records),
+	})
+
 }
