@@ -1,4 +1,3 @@
-````markdown
 # 🐳 API de Gestión de Contenedores en Go
 
 Servicio REST en **Go** para la administración de contenedores Docker asociados a usuarios autenticados.  
@@ -28,6 +27,7 @@ AUTH_SERVICE_URL=https://tu-url-de-auth-service
 PROJECT_ID=tu-proyecto-id
 PORT=8080
 ```
+
 ````
 
 Estructura recomendada del proyecto:
@@ -431,3 +431,4 @@ curl -X POST http://localhost:8080/new/container \
 ```
 
 ---
+````
