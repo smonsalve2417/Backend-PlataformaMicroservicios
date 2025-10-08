@@ -1,3 +1,31 @@
+# 🧠 Descripción del Proyecto
+
+La API de Gestión de Contenedores es un servicio REST desarrollado en Go (Golang) que permite a los usuarios crear, administrar y monitorear contenedores Docker de forma segura y personalizada, vinculados a sus cuentas mediante autenticación JWT.
+
+El sistema integra Docker, MongoDB y Go para ofrecer un entorno de ejecución controlado donde cada usuario puede desplegar y gestionar sus propios servicios o aplicaciones, con seguimiento histórico y estadísticas de uso.
+
+Está pensado como un backend modular y escalable, ideal para integrarse en plataformas que necesiten ofrecer a los usuarios:
+
+- Ejecución de aplicaciones o entornos aislados en contenedores.
+
+- Control sobre los recursos desplegados.
+
+- Monitoreo en tiempo real del estado y uso histórico de contenedores.
+
+# 🎯 Objetivos Principales
+
+- Permitir a los usuarios autenticarse y gestionar sus propios contenedores Docker.
+
+- Implementar un flujo seguro de creación, inicio, detención y eliminación de contenedores.
+
+- Proporcionar visualización histórica de despliegues y fallos.
+
+- Facilitar la automatización de creación de imágenes a partir de archivos cargados (por ejemplo, app.py).
+
+- Mantener un diseño modular, limpio y fácilmente integrable con sistemas externos.
+
+---
+
 # 🐳 API de Gestión de Contenedores en Go
 
 Servicio REST en **Go** para la administración de contenedores Docker asociados a usuarios autenticados.
