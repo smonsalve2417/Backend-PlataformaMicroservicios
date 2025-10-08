@@ -8,6 +8,10 @@ type contenedor struct {
 	Description string `bson:"description" json:"description" validate:"required"`
 }
 
+type contenedorCreated struct {
+	Image string `json:"image" bson:"image" validate:"required"`
+}
+
 type registerUser struct {
 	Email    string `json:"email" bson:"email" validate:"required,email"`
 	Password string `json:"password" bson:"password" validate:"required"`
