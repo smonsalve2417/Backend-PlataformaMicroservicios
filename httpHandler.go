@@ -229,7 +229,7 @@ func (h *handler) HandleRemoveContainer(w http.ResponseWriter, r *http.Request) 
 	}
 	println("User ID from context:", userID)
 
-	var payload contenedor
+	var payload contenedorCreated
 
 	if err := ParseJSON(r, &payload); err != nil {
 		log.Printf("Error parsing JSON: %v", err)
@@ -282,7 +282,7 @@ func (h *handler) HandleStopContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	println("User ID from context:", userID)
 
-	var payload contenedor
+	var payload contenedorCreated
 
 	if err := ParseJSON(r, &payload); err != nil {
 		log.Printf("Error parsing JSON: %v", err)
@@ -337,7 +337,7 @@ func (h *handler) HandleStartContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	println("User ID from context:", userID)
 
-	var payload contenedor
+	var payload contenedorCreated
 
 	if err := ParseJSON(r, &payload); err != nil {
 		log.Printf("Error parsing JSON: %v", err)
