@@ -26,6 +26,12 @@ Está pensado como un backend modular y escalable, ideal para integrarse en plat
 
 ---
 
+# Arquitectura
+
+![Descripción de la imagen](./assets/arquitectura.png)
+
+---
+
 # 🐳 API de Gestión de Contenedores en Go
 
 Servicio REST en **Go** para la administración de contenedores Docker asociados a usuarios autenticados.
