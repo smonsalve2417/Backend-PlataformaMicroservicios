@@ -73,6 +73,8 @@ func main() {
 	handler.registerRoutes(mux)
 	log.Printf("Starting HTTP server at %s", httpAddr)
 
+	//funcion asyncrona que recargue los microservicios y sus estados
+
 	if err := http.ListenAndServe(httpAddr, mux); err != nil {
 		log.Fatal("Failed to start http server", err)
 	}

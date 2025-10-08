@@ -32,7 +32,12 @@ func (h *handler) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /stop/container", WithJWTAuth(h.HandleStopContainer))
 	mux.HandleFunc("POST /start/container", WithJWTAuth(h.HandleStartContainer))
 	mux.HandleFunc("POST /new/image", WithJWTAuth(h.HandleImageCreation))
-	mux.HandleFunc("GET /containers", WithJWTAuth(h.HandleListUserContainers))
+
+	mux.HandleFunc("GET /containers/list", WithJWTAuth(h.HandleListUserContainers))
+	mux.HandleFunc("GET /containers/graphic", WithJWTAuth(h.HandleListUserHistoryGraphic))
+	mux.HandleFunc("GET /containers/history", WithJWTAuth(h.HandleListUserHistory))
+	mux.HandleFunc("GET /containers/last", WithJWTAuth(h.HandleGetLastHistory))
+
 }
 
 func (h *handler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
@@ -187,11 +192,26 @@ func (h *handler) HandleNewContainer(w http.ResponseWriter, r *http.Request) {
 		ContainerName: payload.Image,
 		Status:        status,
 		CreatedAt:     time.Now(),
+		Description:   payload.Description,
+		Type:          payload.Type,
+	}
+
+	recordHistory := ContainerUpdate{
+		UserID:        userID,
+		ContainerName: payload.Image,
+		Status:        status,
+		CreatedAt:     time.Now(),
 	}
 
 	_, err = h.store.SaveContainer(record)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to save container: "+err.Error())
+		return
+	}
+
+	_, err = h.store.SaveUpdate(recordHistory)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to save container history: "+err.Error())
 		return
 	}
 
@@ -233,6 +253,19 @@ func (h *handler) HandleRemoveContainer(w http.ResponseWriter, r *http.Request) 
 	err = h.store.DeleteContainerDocument(userID, payload.Image)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to update container status: "+err.Error())
+		return
+	}
+
+	recordHistory := ContainerUpdate{
+		UserID:        userID,
+		ContainerName: payload.Image,
+		Status:        false,
+		CreatedAt:     time.Now(),
+	}
+
+	_, err = h.store.SaveUpdate(recordHistory)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to save container history: "+err.Error())
 		return
 	}
 
@@ -278,6 +311,19 @@ func (h *handler) HandleStopContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	recordHistory := ContainerUpdate{
+		UserID:        userID,
+		ContainerName: payload.Image,
+		Status:        false,
+		CreatedAt:     time.Now(),
+	}
+
+	_, err = h.store.SaveUpdate(recordHistory)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to save container history: "+err.Error())
+		return
+	}
+
 	WriteJSON(w, http.StatusOK, o)
 
 }
@@ -317,6 +363,19 @@ func (h *handler) HandleStartContainer(w http.ResponseWriter, r *http.Request) {
 	err = h.store.UpdateContainerStatus(userID, payload.Image, true)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to update container status: "+err.Error())
+		return
+	}
+
+	recordHistory := ContainerUpdate{
+		UserID:        userID,
+		ContainerName: payload.Image,
+		Status:        true,
+		CreatedAt:     time.Now(),
+	}
+
+	_, err = h.store.SaveUpdate(recordHistory)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to save container history: "+err.Error())
 		return
 	}
 
@@ -450,7 +509,6 @@ func (h *handler) HandleListUserContainers(w http.ResponseWriter, r *http.Reques
 
 	println("User ID from context:", userID)
 
-	//
 	records, err := h.store.GetContainersByUser(userID)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to fetch containers: "+err.Error())
@@ -462,4 +520,105 @@ func (h *handler) HandleListUserContainers(w http.ResponseWriter, r *http.Reques
 		"count":      len(records),
 	})
 
+}
+
+func (h *handler) HandleListUserHistory(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserIDFromContext(r.Context())
+	if err != nil {
+		log.Printf("Unauthorized access: %v", err)
+		WriteError(w, http.StatusUnauthorized, "unauthorized: "+err.Error())
+		return
+	}
+
+	println("User ID from context:", userID)
+
+	records, err := h.store.GetHistoryByUser(userID)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to fetch containers: "+err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"containers": records,
+		"count":      len(records),
+	})
+
+}
+
+func (h *handler) HandleListUserHistoryGraphic(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserIDFromContext(r.Context())
+	if err != nil {
+		log.Printf("Unauthorized access: %v", err)
+		WriteError(w, http.StatusUnauthorized, "unauthorized: "+err.Error())
+		return
+	}
+
+	println("User ID from context:", userID)
+
+	records, err := h.store.GetHistoryByUser(userID)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "failed to fetch containers: "+err.Error())
+		return
+	}
+
+	const days = 30
+	loc := time.Local
+
+	type agg struct{ dep, err int }
+	byDay := make(map[string]agg)
+
+	for _, rec := range records {
+		t := rec.CreatedAt.In(loc)
+		dayKey := t.Format("2006-01-02")
+
+		a := byDay[dayKey]
+		if rec.Status {
+			a.dep++
+		} else {
+			a.err++
+		}
+		byDay[dayKey] = a
+	}
+
+	monthEs := [...]string{"ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"}
+
+	labels := make([]string, 0, days)
+	deployments := make([]int, 0, days)
+	errorsArr := make([]int, 0, days)
+
+	today := time.Now().In(loc)
+	for i := days - 1; i >= 0; i-- {
+		d := today.AddDate(0, 0, -i)
+		key := d.Format("2006-01-02")
+
+		lbl := fmt.Sprintf("%d %s", d.Day(), monthEs[int(d.Month())-1])
+		labels = append(labels, lbl)
+
+		a := byDay[key]
+		deployments = append(deployments, a.dep)
+		errorsArr = append(errorsArr, a.err)
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"labels":      labels,
+		"deployments": deployments,
+		"errors":      errorsArr,
+	})
+}
+
+func (h *handler) HandleGetLastHistory(w http.ResponseWriter, r *http.Request) {
+	record, err := h.store.GetLastHistory()
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if record == nil {
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"message": "no history records found",
+		})
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, record)
 }
