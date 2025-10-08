@@ -22,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type store struct {
@@ -361,7 +362,7 @@ func (s *store) GetContainersByUser(userID string) ([]ContainerRecord, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	filter := bson.M{"userID": userID}
+	filter := bson.M{"userId": userID}
 	cur, err := collection.Find(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to querry containers: %w", err)
@@ -381,4 +382,120 @@ func (s *store) GetContainersByUser(userID string) ([]ContainerRecord, error) {
 		return nil, fmt.Errorf("cursor error: %w", err)
 	}
 	return results, nil
+}
+
+// Funcion para repetir asyncrono
+func (s *store) GetAllContainers() ([]ContainerRecord, error) {
+	collection := s.database.Collection("containers")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cur, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query containers: %w", err)
+	}
+	defer cur.Close(ctx)
+
+	var results []ContainerRecord
+	for cur.Next(ctx) {
+		var rec ContainerRecord
+		if err := cur.Decode(&rec); err != nil {
+			return nil, fmt.Errorf("failed to decode container: %w", err)
+		}
+		results = append(results, rec)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error: %w", err)
+	}
+
+	return results, nil
+}
+
+func (s *store) SaveUpdate(update ContainerUpdate) (primitive.ObjectID, error) {
+	collection := s.database.Collection("history")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	res, err := collection.InsertOne(ctx, update)
+	if err != nil {
+		return primitive.NilObjectID, fmt.Errorf("failed to insert update: %w", err)
+	}
+
+	oid, ok := res.InsertedID.(primitive.ObjectID)
+	if !ok {
+		return primitive.NilObjectID, fmt.Errorf("inserted document ID is not an ObjectID")
+	}
+	return oid, nil
+}
+
+func (s *store) GetHistoryByUser(userID string) ([]ContainerUpdate, error) {
+	collection := s.database.Collection("history")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.M{"userId": userID}
+	cur, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to querry containers: %w", err)
+	}
+
+	defer cur.Close(ctx)
+
+	var results []ContainerUpdate
+	for cur.Next(ctx) {
+		var rec ContainerUpdate
+		if err := cur.Decode(&rec); err != nil {
+			return nil, fmt.Errorf("failed to decode container : %w", err)
+		}
+		results = append(results, rec)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error: %w", err)
+	}
+	return results, nil
+}
+
+func (s *store) GetAllContainersHistory() ([]ContainerUpdate, error) {
+	collection := s.database.Collection("history")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cur, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query containers: %w", err)
+	}
+	defer cur.Close(ctx)
+
+	var results []ContainerUpdate
+	for cur.Next(ctx) {
+		var rec ContainerUpdate
+		if err := cur.Decode(&rec); err != nil {
+			return nil, fmt.Errorf("failed to decode container: %w", err)
+		}
+		results = append(results, rec)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error: %w", err)
+	}
+
+	return results, nil
+}
+
+func (s *store) GetLastHistory() (*ContainerUpdate, error) {
+	collection := s.database.Collection("history")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
+
+	var result ContainerUpdate
+	err := collection.FindOne(ctx, bson.M{}, opts).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to fetch last history: %w", err)
+	}
+
+	return &result, nil
 }

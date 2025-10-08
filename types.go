@@ -3,7 +3,9 @@ package main
 import "time"
 
 type contenedor struct {
-	Image string `json:"image" bson:"image" validate:"required"`
+	Image       string `json:"image" bson:"image" validate:"required"`
+	Type        string `bson:"type" json:"type" validate:"required"`
+	Description string `bson:"description" json:"description" validate:"required"`
 }
 
 type registerUser struct {
@@ -34,6 +36,16 @@ type verifyTokenResponse struct {
 }
 
 type ContainerRecord struct {
+	UserID        string    `bson:"userId" json:"userId"`
+	ContainerName string    `bson:"containerName" json:"containerName"`
+	Status        bool      `bson:"status" json:"status"`
+	Description   string    `bson:"description" json:"description" validate:"required"`
+	CreatedAt     time.Time `bson:"createdAt" json:"createdAt"`
+	UpdatedAt     time.Time `bson:"updatedAt" json:"updatedAt"`
+	Type          string    `bson:"type" json:"type"`
+}
+
+type ContainerUpdate struct {
 	UserID        string    `bson:"userId" json:"userId"`
 	ContainerName string    `bson:"containerName" json:"containerName"`
 	Status        bool      `bson:"status" json:"status"`
