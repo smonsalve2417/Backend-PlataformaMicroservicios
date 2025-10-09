@@ -499,3 +499,57 @@ func (s *store) GetLastHistory() (*ContainerUpdate, error) {
 
 	return &result, nil
 }
+
+func (s *store) IsOwner(userID, containerName string) (bool, error) {
+	collection := s.database.Collection("containers")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"userId":        userID,
+		"containerName": containerName,
+	}
+
+	// Solo buscamos uno porque no nos interesa el contenido
+	var result bson.M
+	err := collection.FindOne(ctx, filter).Decode(&result)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil // No existe el documento → no es el dueño
+		}
+		return false, fmt.Errorf("error checking ownership: %w", err)
+	}
+
+	return true, nil // Existe → sí es el dueño
+}
+
+func (s *store) UpdateContainerInfo(userID, containerName, newType, newDescription string) error {
+	collection := s.database.Collection("containers")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"userId":        userID,
+		"containerName": containerName,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"type":        newType,
+			"description": newDescription,
+			"updatedAt":   time.Now(),
+		},
+	}
+
+	result, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update container info: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("no container found with name %s for user %s", containerName, userID)
+	}
+
+	return nil
+}
