@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -68,6 +69,11 @@ func main() {
 	//"libreria" de funciones a utilizar
 	store := NewStore(mongoCLient.GetDatabase().Client(), dockerClient)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go StartPeriodically(ctx, store, 15*time.Second)
+
 	//rutas del servidor http
 	handler := NewHandler(store)
 	handler.registerRoutes(mux)
@@ -79,6 +85,56 @@ func main() {
 		log.Fatal("Failed to start http server", err)
 	}
 
+}
+
+func StartContainersWithDB(ctx context.Context, s *store) {
+	records, err := s.GetAllContainers()
+	if err != nil {
+		log.Printf("[startup] error leyendo containers :%v", err)
+		return
+	}
+
+	started := 0
+	skipped := 0
+
+	for _, rec := range records {
+		if !rec.Status {
+			skipped++
+			continue
+		}
+
+		running, err := s.IsContainerRunning(rec.ContainerName)
+		if err != nil {
+			log.Printf("[startup] error consultando %s: %v", rec.ContainerName, err)
+			continue
+		}
+		if running {
+			skipped++
+			continue
+		}
+		if err := s.StartContainer(rec.ContainerName); err != nil {
+			log.Printf("[startup] no se pudo iniciar %s: %v", rec.ContainerName, err)
+			continue
+		}
+		started++
+		log.Printf("[startup] iniciado %s", rec.ContainerName)
+	}
+	log.Printf("[startup] verificación inicial terminada. iniciados=%d, omitidos=%d, total=%d", started, skipped, len(records))
+}
+
+func StartPeriodically(ctx context.Context, s *store, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			StartContainersWithDB(ctx, s)
+		case <-ctx.Done():
+			log.Println("[startup] bucle detenido")
+			return
+		}
+	}
 }
 
 func GetEnv(key string, fallback string) string {
