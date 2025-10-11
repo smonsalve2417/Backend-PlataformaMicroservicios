@@ -62,7 +62,7 @@ func (s *store) NewContainer(containerImage, serviceName string) error {
 	if !exists {
 		log.Printf("Image %s not found, pulling from Docker Hub...", containerImage)
 		if err := s.ImagePull(containerImage); err != nil {
-			log.Fatalf("Error pulling image: %v", err)
+			log.Printf("Error pulling image: %v", err)
 			return err
 		}
 		log.Printf("Image %s pulled successfully", containerImage)
@@ -89,13 +89,13 @@ func (s *store) NewContainer(containerImage, serviceName string) error {
 		NetworkMode: "backend-network", // usa la misma red que Traefik
 	}, nil, nil, serviceName)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf(err.Error())
 		return err
 	}
 
 	// Iniciar contenedor
 	if err := s.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		log.Fatal(err)
+		log.Printf(err.Error())
 		return err
 	}
 

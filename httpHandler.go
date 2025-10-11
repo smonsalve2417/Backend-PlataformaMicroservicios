@@ -543,6 +543,8 @@ func (h *handler) HandleEditContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	time.Sleep(time.Second * 5)
+
 	status, err := h.store.IsContainerRunning(name)
 	println("Container status:", status)
 	if err != nil {
@@ -550,10 +552,13 @@ func (h *handler) HandleEditContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(time.Second * 5)
-
 	if !status {
 		WriteError(w, http.StatusBadRequest, "the container is not running after creation")
+		err = h.store.UpdateContainerStatus(userID, name, true)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "failed to update container status: "+err.Error())
+			return
+		}
 		return
 	}
 

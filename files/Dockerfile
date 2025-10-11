@@ -7,7 +7,7 @@ WORKDIR /app
 # Copiar los archivos del proyecto al contenedor
 COPY server.py app.py ./
 
-RUN install requests
+RUN pip install requests
 
 # Exponer el puerto donde correrá el servidor
 EXPOSE 8000
