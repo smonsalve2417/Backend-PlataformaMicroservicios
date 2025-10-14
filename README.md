@@ -1,7 +1,7 @@
-
 # Repositorio del Front
 
 - https://github.com/Is-monp/Microservices_f
+
 ---
 
 # 🧠 Descripción del Proyecto
@@ -135,6 +135,16 @@ go run main.go
 ```
 
 Por defecto, el servicio se inicia en `http://localhost:8080`.
+
+La forma de iniciarlo por Docker es la siguiente:
+
+```bash
+
+docker network create --driver bridge backend-network
+docker compose up -d --build
+
+
+```
 
 ---
 
